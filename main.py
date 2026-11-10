@@ -220,8 +220,13 @@ bot = Bot(BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher(storage=MemoryStorage())
 scheduler = AsyncIOScheduler(timezone=TZ)
 
-# Gemini AI (v1beta)
-ai = genai.Client(api_key=GEMINI_API_KEY, http_options={"api_version": "v1beta"})
+# Gemini AI (v1beta) - xavfsiz initsializatsiya (kalit bo'lmasa ham bot to'xtab qolmaydi)
+ai = None
+if GEMINI_API_KEY and GEMINI_API_KEY.strip():
+    try:
+        ai = genai.Client(api_key=GEMINI_API_KEY.strip(), http_options={"api_version": "v1beta"})
+    except Exception as _e_init_ai:
+        logging.warning(f"Boshlang'ich Gemini client xatosi: {_e_init_ai}")
 
 # ============================ BAZA VA MIGRATSIYA ============================
 db = sqlite3.connect("bot.db", check_same_thread=False)
@@ -403,7 +408,13 @@ def get_gemini_api_key():
 
 def get_gemini_client():
     key = get_gemini_api_key()
-    return genai.Client(api_key=key, http_options={"api_version": "v1beta"})
+    if not key or not key.strip():
+        return None
+    try:
+        return genai.Client(api_key=key.strip(), http_options={"api_version": "v1beta"})
+    except Exception as e_client:
+        logging.warning(f"get_gemini_client xatosi: {e_client}")
+        return None
 
 
 async def test_gemini_key(key: str = None):
@@ -3587,37 +3598,38 @@ Javobni FAQAT toza JSON formatida qaytar:
     gemini_tools = [genai_types.Tool(google_search=genai_types.GoogleSearch())] if has_grounding else None
     models_to_try = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-flash-latest"]
 
-    for m in models_to_try:
-        try:
-            cfg = genai_types.GenerateContentConfig(
-                temperature=0.95,
-                tools=gemini_tools
-            ) if gemini_tools else genai_types.GenerateContentConfig(temperature=0.95)
+    if client:
+        for m in models_to_try:
             try:
-                r = await client.aio.models.generate_content(
-                    model=m,
-                    contents=prompt,
-                    config=cfg
-                )
-            except Exception as e_tools:
-                # Agar muayyan modelda tool xatolik bersa, toolsiz oddiy konfiguratsiya bilan qayta urinish
-                logging.info(f"Gemini ({m}) tool bilan istisno ({e_tools}), toolsiz qayta urinmoqda...")
-                r = await client.aio.models.generate_content(
-                    model=m,
-                    contents=prompt,
-                    config=genai_types.GenerateContentConfig(temperature=0.95)
-                )
+                cfg = genai_types.GenerateContentConfig(
+                    temperature=0.95,
+                    tools=gemini_tools
+                ) if gemini_tools else genai_types.GenerateContentConfig(temperature=0.95)
+                try:
+                    r = await client.aio.models.generate_content(
+                        model=m,
+                        contents=prompt,
+                        config=cfg
+                    )
+                except Exception as e_tools:
+                    # Agar muayyan modelda tool xatolik bersa, toolsiz oddiy konfiguratsiya bilan qayta urinish
+                    logging.info(f"Gemini ({m}) tool bilan istisno ({e_tools}), toolsiz qayta urinmoqda...")
+                    r = await client.aio.models.generate_content(
+                        model=m,
+                        contents=prompt,
+                        config=genai_types.GenerateContentConfig(temperature=0.95)
+                    )
 
-            raw = (r.text or "").strip()
-            if raw:
-                extracted = extract_post_from_text(raw, c, theme)
-                if extracted and extracted.get("post_text"):
-                    extracted["current_topic"] = current_topic
-                    extracted["arc_day"] = arc_day
-                    extracted["arc_total_days"] = arc_total_days
-                    return extracted
-        except Exception as e:
-            logging.warning(f"AI generatsiya urinishi ({m}) muvaffaqiyatsiz: {e}")
+                raw = (r.text or "").strip()
+                if raw:
+                    extracted = extract_post_from_text(raw, c, theme)
+                    if extracted and extracted.get("post_text"):
+                        extracted["current_topic"] = current_topic
+                        extracted["arc_day"] = arc_day
+                        extracted["arc_total_days"] = arc_total_days
+                        return extracted
+            except Exception as e:
+                logging.warning(f"AI generatsiya urinishi ({m}) muvaffaqiyatsiz: {e}")
             # To'g'ridan-to'g'ri aiohttp REST orqali qayta sinab ko'rish
             try:
                 k = get_gemini_api_key()
@@ -4326,14 +4338,15 @@ async def group_handler(m: types.Message):
         if not ans:
             try:
                 client = get_gemini_client()
-                for m_try in ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-flash-latest"]:
-                    try:
-                        r = await client.aio.models.generate_content(model=m_try, contents=f"{system_prompt}\n\n{ai_prompt}")
-                        ans = (r.text or "").strip()
-                        if ans:
-                            break
-                    except Exception:
-                        continue
+                if client:
+                    for m_try in ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-flash-latest"]:
+                        try:
+                            r = await client.aio.models.generate_content(model=m_try, contents=f"{system_prompt}\n\n{ai_prompt}")
+                            ans = (r.text or "").strip()
+                            if ans:
+                                break
+                        except Exception:
+                            continue
             except Exception as e:
                 logging.warning(f"Gemini fallback xatosi: {e}")
                 
