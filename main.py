@@ -5070,24 +5070,23 @@ async def bc_cancel(cb: types.CallbackQuery, state: FSMContext):
 
 # ============================ ISHGA TUSHIRISH ============================
 async def run_render_web_server():
-    port_str = os.getenv("PORT")
-    if port_str:
-        try:
-            port = int(port_str)
-            async def handle_ping(request):
-                return web.Response(text="Bot is running smoothly!")
+    try:
+        port = int(os.getenv("PORT", "10000"))
+        async def handle_ping(request):
+            return web.Response(text="OK: Bot is running smoothly on Render!\n")
 
-            app = web.Application()
-            app.router.add_get("/", handle_ping)
-            app.router.add_get("/health", handle_ping)
-            
-            runner = web.AppRunner(app)
-            await runner.setup()
-            site = web.TCPSite(runner, "0.0.0.0", port)
-            await site.start()
-            logging.info(f"Render Health Check server {port}-portda ishga tushdi.")
-        except Exception as e:
-            logging.warning(f"Health server xatosi: {e}")
+        app = web.Application()
+        app.router.add_get("/", handle_ping)
+        app.router.add_get("/health", handle_ping)
+        app.router.add_get("/ping", handle_ping)
+        
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, "0.0.0.0", port)
+        await site.start()
+        logging.info(f"Render Health Check HTTP server 0.0.0.0:{port} manzilida muvaffaqiyatli ishga tushdi.")
+    except Exception as e:
+        logging.warning(f"Health server xatosi: {e}")
 
 
 async def weekly_stats_report():
