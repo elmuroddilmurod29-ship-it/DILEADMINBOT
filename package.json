@@ -1,16 +1,9 @@
 {
-  "name": "kafolat-bot",
-  "version": "2.1.0",
-  "main": "bot.js",
+  "name": "kafolat-escrow-bot",
+  "version": "2.0.0",
+  "description": "Kafil Garant Escrow Telegram Bot",
+  "main": "main.py",
   "scripts": {
-    "start": "node bot.js"
-  },
-  "dependencies": {
-    "node-telegram-bot-api": "^0.66.0",
-    "@google/generative-ai": "^0.21.0",
-    "dotenv": "^16.4.5"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "start": "python main.py"
   }
 }
