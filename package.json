@@ -1,9 +1,9 @@
 {
   "name": "kafolat-escrow-bot",
-  "version": "2.0.0",
-  "description": "Kafil Garant Escrow Telegram Bot",
-  "main": "main.py",
+  "version": "3.0.0",
+  "description": "Kafolatli Savdo Escrow Telegram Boti",
+  "main": "bot.py",
   "scripts": {
-    "start": "python main.py"
+    "start": "python bot.py"
   }
 }
