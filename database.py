@@ -5,7 +5,7 @@ Barcha 10 ta jadval, tranzaksiyalar, migratsiyalar va yordamchi funksiyalar.
 import sqlite3
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Any, List, Dict, Tuple
 from config import DB_PATH, TZ, DEFAULT_CARD_NUMBER, DEFAULT_CARD_OWNER
 
@@ -295,14 +295,33 @@ def log_deal_message(deal_id: str, sender_id: int, sender_tag: str, role: str, t
 def get_deal_messages(deal_id: str, limit: int = 50) -> List[sqlite3.Row]:
     return q("SELECT * FROM deal_messages WHERE deal_id=? ORDER BY id ASC LIMIT ?", (deal_id, limit))
 
-# ==================== ARIZALAR (COMPLAINTS) ====================
-def create_complaint(deal_id: str, complainant_id: int, complainant_username: str,
-                     accused_id: Optional[int], accused_username: str, reason: str, deadline_s: str) -> int:
+# ==================== PUL YECHISH (WITHDRAWALS) ====================
+def create_withdrawal(user_id: int, amount: int, card_number: str, card_owner: str) -> int:
     now_s = datetime.now(TZ).isoformat()
+    return q("""
+    INSERT INTO withdrawals (user_id, amount, card_number, card_owner, status, created_at)
+    VALUES (?, ?, ?, ?, 'pending', ?)
+    """, (user_id, amount, card_number, card_owner, now_s), commit=True)
+
+def get_pending_withdrawals(limit: int = 10) -> List[sqlite3.Row]:
+    return q("SELECT * FROM withdrawals WHERE status='pending' ORDER BY created_at ASC LIMIT ?", (limit,))
+
+def complete_withdrawal(withdrawal_id: int) -> bool:
+    q("UPDATE withdrawals SET status='completed' WHERE id=?", (withdrawal_id,), commit=True)
+    return True
+
+# ==================== ARIZALAR (COMPLAINTS) ====================
+def create_complaint(deal_id: str = "", complainant_id: int = 0, complainant_username: str = "",
+                     accused_id: Optional[int] = None, accused_username: str = "", reason: str = "",
+                     deadline_s: Optional[str] = None) -> int:
+    now = datetime.now(TZ)
+    now_s = now.isoformat()
+    if not deadline_s:
+        deadline_s = (now + timedelta(days=5)).isoformat()
     return q("""
     INSERT INTO complaints (deal_id, complainant_id, complainant_username, accused_id, accused_username, reason, status, deadline_at, created_at)
     VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)
-    """, (deal_id, complainant_id, complainant_username, accused_id, accused_username, reason, deadline_s, now_s), commit=True)
+    """, (deal_id or "", complainant_id, complainant_username or "", accused_id, accused_username or "", reason, deadline_s, now_s), commit=True)
 
 def get_user_complaints(user_id: int) -> List[sqlite3.Row]:
     return q("SELECT * FROM complaints WHERE complainant_id=? ORDER BY id DESC", (user_id,))
@@ -338,3 +357,19 @@ def import_user_backup(user_id: int, data: dict) -> bool:
     except Exception as e:
         logger.error(f"Backup tiklashda xato: {e}")
         return False
+
+def export_user_backup_json(user_id: int) -> bytes:
+    data = export_user_backup(user_id)
+    return json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+
+def import_user_backup_json(user_id: int, json_data: Any) -> Tuple[bool, int]:
+    try:
+        if isinstance(json_data, bytes):
+            json_data = json_data.decode("utf-8")
+        data = json.loads(json_data)
+        ok = import_user_backup(user_id, data)
+        deals_count = len(data.get("deals", []))
+        return ok, deals_count
+    except Exception as e:
+        logger.error(f"Backup import xatosi: {e}")
+        return False, 0

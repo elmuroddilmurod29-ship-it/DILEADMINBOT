@@ -2,6 +2,7 @@
 CONFIG.PY - Kafil / Garant Telegram Boti Konfiguratsiyasi
 """
 import os
+import re
 from datetime import timezone, timedelta
 from typing import Any, List
 from dotenv import load_dotenv
@@ -56,6 +57,24 @@ def fmt(num: Any) -> str:
     except Exception:
         return str(num)
 
+def format_card(card: Any) -> str:
+    """16 xonali karta raqamini chiroyli ajratib beradi (5614 6835 1125 2157)."""
+    if not card:
+        return ""
+    digits = re.sub(r"\D", "", str(card))
+    if len(digits) == 16:
+        return f"{digits[0:4]} {digits[4:8]} {digits[8:12]} {digits[12:16]}"
+    return str(card)
+
 def is_admin(user_id: int) -> bool:
     """Foydalanuvchi admin ekanligini tekshiradi."""
-    return user_id in ADMIN_IDS
+    if user_id in ADMIN_IDS:
+        return True
+    try:
+        import database as db
+        custom = db.get_setting("extra_admins", "")
+        if custom and str(user_id) in [x.strip() for x in custom.split(",")]:
+            return True
+    except Exception:
+        pass
+    return False
