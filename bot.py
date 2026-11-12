@@ -15,7 +15,9 @@ from typing import Optional, List, Dict, Any, Tuple
 
 from aiohttp import web, ClientSession, ClientTimeout
 from aiogram import Bot, Dispatcher, Router, F
-from aiogram.filters import Command, CommandStart
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+from aiogram.filters import Command, CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -44,7 +46,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger("kafil_bot")
 
-bot = Bot(token=BOT_TOKEN)
+bot = Bot(
+    token=BOT_TOKEN,
+    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+)
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 router = Router()
@@ -313,7 +318,7 @@ async def referral_leave_checker_loop():
             logger.error(f"referral checker loop xatosi: {e}")
 
 # ============================ 7. BUYRUQLAR VA BEKOR QILISH ============================
-@router.message(F.text.contains("Bekor") | F.text.startswith("❌"))
+@router.message(StateFilter("*"), F.text.contains("Bekor") | F.text.startswith("❌") | Command("cancel"))
 async def universal_cancel_handler(msg: Message, state: FSMContext):
     """Har qanday amaliyotni bekor qilib asosiy menyuga qaytaruvchi universal handler."""
     await state.clear()
@@ -329,7 +334,7 @@ async def cancel_fsm_callback(call: CallbackQuery, state: FSMContext):
     await call.answer("Bekor qilindi.")
     await call.message.edit_text("❌ Amaliyot bekor qilindi.")
 
-@router.message(CommandStart())
+@router.message(StateFilter("*"), CommandStart())
 async def start_cmd(msg: Message, state: FSMContext):
     await state.clear()
     uid = msg.from_user.id
@@ -436,7 +441,7 @@ async def callback_check_sub(call: CallbackQuery):
     )
 
 # ============================ 8. 1-TUGMA: 📜 TARIX ============================
-@router.message(F.text.contains("Tarix"))
+@router.message(StateFilter("*"), F.text.contains("Tarix"))
 async def history_handler(msg: Message, state: FSMContext):
     await state.clear()
     uid = msg.from_user.id
@@ -612,7 +617,7 @@ async def process_deal_comp_reason(msg: Message, state: FSMContext):
             pass
 
 # ============================ 9. 2-TUGMA: 🆘 SOS (YORDAM) ============================
-@router.message(F.text.contains("SOS") | F.text.contains("Yordam"))
+@router.message(StateFilter("*"), F.text.contains("SOS") | F.text.contains("Yordam"))
 async def sos_menu_handler(msg: Message, state: FSMContext):
     await state.clear()
     text = (
@@ -699,6 +704,7 @@ async def process_ai_query(msg: Message, state: FSMContext):
         f"<i>Agar javob sizni qoniqtirmasa yoki qo'shimcha yordam kerak bo'lsa, quyidagi tugma orqali adminga yo'llashingiz mumkin.</i>",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
     )
+    await state.clear()
 
 @router.callback_query(F.data == "ai_resolved")
 async def ai_resolved_cb(call: CallbackQuery, state: FSMContext):
@@ -841,7 +847,7 @@ async def process_comp_reason(msg: Message, state: FSMContext):
             pass
 
 # ============================ 10. 3-TUGMA: 👥 REFERAL TIZIMI ============================
-@router.message(F.text.contains("Referal"))
+@router.message(StateFilter("*"), F.text.contains("Referal"))
 async def referral_menu_handler(msg: Message, state: FSMContext):
     await state.clear()
     uid = msg.from_user.id
@@ -989,7 +995,7 @@ async def withdraw_proc_owner(msg: Message, state: FSMContext):
             pass
 
 # ============================ 11. 4-TUGMA: 🤝 YANGI SAVDO OCHISH ============================
-@router.message(F.text.contains("Yangi Savdo") | F.text.contains("Savdo Ochish"))
+@router.message(StateFilter("*"), F.text.contains("Yangi Savdo") | F.text.contains("Savdo Ochish") | F.text.contains("Savdo"))
 async def create_deal_menu_handler(msg: Message, state: FSMContext):
     await state.clear()
     uid = msg.from_user.id
@@ -1437,7 +1443,7 @@ async def scam_cancel_cb(call: CallbackQuery):
     await call.message.edit_text("ℹ️ Sotuvchi qayta qo'shilishi kutilmoqda.")
 
 # ============================ 13. 5-TUGMA: 🚫 FIRIBGARLAR RO'YXATI ============================
-@router.message(F.text.contains("Firibgar"))
+@router.message(StateFilter("*"), F.text.contains("Firibgar") | F.text.contains("Mashenik") | F.text.contains("Qora ro'yxat"))
 async def blacklist_menu_handler(msg: Message, state: FSMContext):
     await state.clear()
     rows = db.get_all_blacklisted(25)
@@ -1468,7 +1474,7 @@ async def blacklist_menu_handler(msg: Message, state: FSMContext):
     await msg.answer(text, reply_markup=main_menu_keyboard(msg.from_user.id))
 
 # ============================ 14. 6-TUGMA: 💾 ZAXIRA NUSXA (BACKUP) ============================
-@router.message(F.text.contains("Zaxira") | F.text.contains("Backup"))
+@router.message(StateFilter("*"), F.text.contains("Zaxira") | F.text.contains("Backup"))
 async def backup_menu_handler(msg: Message, state: FSMContext):
     await state.clear()
     text = (
@@ -1528,7 +1534,7 @@ async def process_backup_doc(msg: Message, state: FSMContext):
         await msg.answer("❌ Fayl formati yaroqsiz.", reply_markup=main_menu_keyboard(msg.from_user.id))
 
 # ============================ 15. 7-TUGMA: 📑 ARIZALARIM ============================
-@router.message(F.text.contains("Arizalarim") | F.text.contains("Ariza"))
+@router.message(StateFilter("*"), F.text.contains("Arizalarim") | F.text.contains("Ariza"))
 async def my_complaints_handler(msg: Message, state: FSMContext):
     await state.clear()
     uid = msg.from_user.id
@@ -1588,7 +1594,26 @@ async def withdraw_comp_cb(call: CallbackQuery):
             pass
 
 # ============================ 16. 8-TUGMA: 👑 ADMIN PANEL ============================
-@router.message(F.text.contains("Admin") | Command("admin"))
+@router.message(StateFilter("*"), Command("id"))
+async def get_my_id_cmd(msg: Message):
+    uid = msg.from_user.id
+    await msg.answer(f"🆔 <b>Sizning Telegram ID raqamingiz:</b> <code>{uid}</code>\n<i>(Nusxalash uchun ID ustiga bosing)</i>")
+
+@router.message(StateFilter("*"), Command("auth_admin"))
+async def auth_admin_cmd(msg: Message):
+    uid = msg.from_user.id
+    custom = db.get_setting("extra_admins", "")
+    admins_list = [x.strip() for x in custom.split(",") if x.strip()]
+    if str(uid) not in admins_list:
+        admins_list.append(str(uid))
+        db.set_setting("extra_admins", ",".join(admins_list))
+    await msg.answer(
+        f"✅ <b>Tabriklaymiz!</b> Siz (ID: <code>{uid}</code>) muvaffaqiyatli bot administratori qilib tayinlandingiz!\n\n"
+        f"Endi «👑 Admin Panel» tugmasini bosib boshqaruv paneliga kirishingiz mumkin.",
+        reply_markup=main_menu_keyboard(uid)
+    )
+
+@router.message(StateFilter("*"), F.text.lower().contains("admin") | Command("admin"))
 async def admin_panel_handler(msg: Message, state: FSMContext):
     await state.clear()
     uid = msg.from_user.id
@@ -1596,10 +1621,11 @@ async def admin_panel_handler(msg: Message, state: FSMContext):
         await msg.answer(
             f"👑 <b>ADMIN BOSHQARUV PANELI</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"⚠️ <i>Kechirasiz, siz ushbu botning administratori emassiz.</i>\n\n"
+            f"⚠️ <b>Kechirasiz, siz ushbu botning administratori emassiz!</b>\n\n"
             f"🆔 <b>Sizning Telegram ID raqamingiz:</b> <code>{uid}</code>\n"
             f"<i>(ID ustiga bosing, avtomatik nusxalanadi)</i>\n\n"
-            f"📌 <i>Agar siz bot egasi bo'lsangiz, ushbu ID raqamni sozlamalarga kiriting.</i>",
+            f"📌 <b>Admin huquqini darhol faollashtirish uchun:</b>\n"
+            f"Botga <code>/auth_admin</code> buyrug'ini yuboring.",
             reply_markup=main_menu_keyboard(uid)
         )
         return
