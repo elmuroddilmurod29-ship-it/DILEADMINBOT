@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Telegram Bot Token
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8479391754:AAFavvM86ZNJsn9VAv_I2krOcGTmBkY2zzY").strip()
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8479391754:AAHH8Ffo4YsmtV8qI7Z9XTJqz9BDsSbXaAA").strip()
 
 # Admin Telegram ID raqamlari
 ADMIN_ID_RAW = os.getenv("ADMIN_IDS", os.getenv("ADMIN_ID", "6125160021"))
